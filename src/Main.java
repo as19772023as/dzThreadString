@@ -1,19 +1,18 @@
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
-
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
         long startTs = System.currentTimeMillis(); // start time
+        final ExecutorService threadPoll = Executors.newFixedThreadPool(4);
+        List<Future<Integer>> list = new ArrayList<>();
 
-        List<Thread> threads = new ArrayList<>();
-        Thread threadN;
         for (String text : texts) {
-
-            threadN = new Thread(() -> {
+            Callable<Integer> myCallable = () -> {
                 int maxSize = 0;
                 for (int i = 0; i < text.length(); i++) {
                     for (int j = 0; j < text.length(); j++) {
@@ -33,17 +32,24 @@ public class Main {
                     }
                 }
                 System.out.println(text.substring(0, 100) + " -> " + maxSize);
-            });
-            threads.add(threadN);
-            threadN.start();
+                return maxSize;
+            };
+            list.add(threadPoll.submit(myCallable));
         }
-
-        for (Thread thread : threads) {
-            thread.join(); // зависаем, ждём когда поток объект которого лежит в thread завершится
+        int resultMax = 0;
+        for (Future<Integer> fut : list) {
+            try {
+                if (resultMax < fut.get()) {
+                    resultMax = fut.get();
+                }
+            } catch (InterruptedException | ExecutionException e) {
+                return;
+            }
         }
-        
         long endTs = System.currentTimeMillis(); // end time
         System.out.println("Time: " + (endTs - startTs) + " ms");
+        System.out.println("максимальный интервал значений среди всех строк:  " + resultMax);
+        threadPoll.shutdown();
     }
 
     public static String generateText(String letters, int length) {
@@ -55,3 +61,4 @@ public class Main {
         return text.toString();
     }
 }
+
