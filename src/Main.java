@@ -3,53 +3,32 @@ import java.util.concurrent.*;
 
 public class Main {
     public static void main(String[] args) throws ExecutionException, InterruptedException {
+//       int x = Runtime.getRuntime().availableProcessors(); // сколько возможных max поктоков в системе
+//        System.out.println(x);
+
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
+
+        List<Future> futureList = new ArrayList<>();
+        int maxValue = 0;
+        final ExecutorService threadPoll = Executors.newFixedThreadPool(3);
+
         long startTs = System.currentTimeMillis(); // start time
-        final ExecutorService threadPoll = Executors.newFixedThreadPool(4);
-        List<Future<Integer>> list = new ArrayList<>();
 
         for (String text : texts) {
-            Callable<Integer> myCallable = () -> {
-                int maxSize = 0;
-                for (int i = 0; i < text.length(); i++) {
-                    for (int j = 0; j < text.length(); j++) {
-                        if (i >= j) {
-                            continue;
-                        }
-                        boolean bFound = false;
-                        for (int k = i; k < j; k++) {
-                            if (text.charAt(k) == 'b') {
-                                bFound = true;
-                                break;
-                            }
-                        }
-                        if (!bFound && maxSize < j - i) {
-                            maxSize = j - i;
-                        }
-                    }
-                }
-                System.out.println(text.substring(0, 100) + " -> " + maxSize);
-                return maxSize;
-            };
-            list.add(threadPoll.submit(myCallable));
+            futureList.add(threadPoll.submit(new CollableTask(text)));
         }
-        int resultMax = 0;
-        for (Future<Integer> fut : list) {
-            try {
-                if (resultMax < fut.get()) {
-                    resultMax = fut.get();
-                }
-            } catch (InterruptedException | ExecutionException e) {
-                return;
-            }
+
+        for (Future future : futureList) {
+            maxValue = Math.max((int) future.get(), maxValue);
         }
-        long endTs = System.currentTimeMillis(); // end time
-        System.out.println("Time: " + (endTs - startTs) + " ms");
-        System.out.println("максимальный интервал значений среди всех строк:  " + resultMax);
+        System.out.println(maxValue);
         threadPoll.shutdown();
+
+        long endTs = System.currentTimeMillis();
+        System.out.println("Time: " + (endTs - startTs) + ".");
     }
 
     public static String generateText(String letters, int length) {
